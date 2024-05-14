@@ -1,9 +1,8 @@
 # name: Load Chart
 # source: https://github.com/montaguethomas/ubersicht-widgets/tree/master/loadchart
 
+# Vars needed for style rendering
 refreshFrequency = 5000 # milliseconds
-numcores = 4 # number of physical cpu cores
-
 colors =
   low      : "rgb(60, 160, 189)"
   normal   : "rgb(88, 189, 60)"
@@ -21,7 +20,7 @@ settings:
     bars: false
     period: true
 
-command: "sysctl -n vm.loadavg|awk '{print $2}'"
+command: "sysctl -n hw.physicalcpu && sysctl -n vm.loadavg|awk '{print $2}'"
 
 refreshFrequency: refreshFrequency # milliseconds
 
@@ -174,14 +173,18 @@ afterRender: (domEl) ->
     @$chart.append ($bar = $('<div class="bar">')).addClass @colorClass(0.00)
 
 update: (output, domEl) ->
+  # parse output
+  lines    = output.split("\n")
+  @numcores = lines[0]
+  load     = lines[1]
+
   # figure out new max load
-  load  = parseFloat output.replace(/\n/g,'')
-  max   = Math.max.apply(Math, @loads)
-  max   = Math.max load, max
+  max = Math.max.apply(Math, @loads)
+  max = Math.max load, max
 
   $stat = $(domEl).find('h1')
   $stat.removeClass('highest higher high normal low')
-  $stat.html(output.replace(/\./,'<i>.</i>'))
+  $stat.html(load.replace(/\./, '<i>.</i>'))
 
   if @settings.animations.period
     $stat.find('i').addClass @colorClass(load)
@@ -196,8 +199,7 @@ update: (output, domEl) ->
   @loads.push load
 
   # create new bar
-  ($bar = $('<div class="bar">'))
-    .addClass @colorClass(load)
+  ($bar = $('<div class="bar">')).addClass @colorClass(load)
 
   # remove old bars and loads
   if bars.length >= @settings.bars
@@ -211,14 +213,15 @@ update: (output, domEl) ->
 
 colorClass: (load) ->
   switch
-    when load >= (numcores * 2.0) then 'urgent'
-    when load >= (numcores * 1.5) then 'important'
-    when load >= (numcores * 1.0) then 'high'
-    when load >= (numcores * 0.5) then 'normal'
+    when load >= (@numcores * 2.0) then 'urgent'
+    when load >= (@numcores * 1.5) then 'important'
+    when load >= (@numcores * 1.0) then 'high'
+    when load >= (@numcores * 0.5) then 'normal'
     else 'low'
 
 setBarHeight: (bar, load, max) ->
   bar.style.webkitTransform = "scale(1, #{@chartHeight * load / max})"
 
 loads: []
+numcores: 0
 prevMax: null
